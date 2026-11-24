@@ -1,0 +1,46 @@
+name: Build MediaWiki Fork
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '1.43/fpm-alpine/Dockerfile'
+
+permissions:
+  packages: write
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: tupsi/mediawiki-upstream
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Fork Repository
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract MediaWiki Version
+        id: get_version
+        run: |
+          VERSION=$(grep -oP 'MEDIAWIKI_VERSION=\K[0-9\.]+' ./1.43/fpm-alpine/Dockerfile)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build and Push to GHCR
+        uses: docker/build-push-action@v5
+        with:
+          context: ./1.43/fpm-alpine
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get_version.outputs.version }}-fpm-alpine
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:1.43-fpm-alpine
